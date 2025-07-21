@@ -1,0 +1,85 @@
+---
+title: "HA.4.2__Advanced"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.4.2 (Advanced - 3 points)
+
+From Aggarwal (2016), read the following text about coverage as an evaluation measure for recommender systems:
+
+> The notion of item-space coverage is analogous to that of user-space coverage. Item- space coverage measures the fraction of items for which the ratings of at least *k* users can be predicted. In practice, however, this notion is rarely used, because recommender systems generally provide recommendation lists for users, and they are only rarely used for generating recommended users for items.
+A different form of item-space coverage evaluation is defined by the notion of catalog coverage, which is specifically suited to recommendation lists. Note that the aforementioned definition was tailored to the prediction of the values of ratings. Imagine a scenario where every entry in the ratings matrix can be predicted by an algorithm, but the same set of top-k items is always recommended to every user. Therefore, even though the aforementioned definition of item-space coverage would suggest good performance, the actual coverage across all users is very limited. In other words, the recommendations are not diverse across users, and the catalog of items is not fully covered. Let \(T_u\) represent the list of top-k items recommended to user \(u ∈ \{1 . . . m\}\). The catalog coverage CC is defined as the fraction of items that are recommended to at least one user.
+$$
+CC = \frac{|\bigcup_{u=1}^{m} T_u|}{n}
+$$
+Here, the notation *n* represents the number of items.
+
+
+Calculate the catalog coverage (CC) for any three recommender models we have used in the course. You are free to choose the *k*, if you are unsure, use top-30. 
+
+```{r}
+library(recommenderlab)
+data("MovieLense")
+ML_df <- as(MovieLense,'data.frame')
+ML_df <- ML_df[-which(ML_df$item=='unknown'),]
+
+ratings_per_movie <- aggregate(user~item,ML_df,length)
+ML_df <- ML_df[!(ML_df[,'item']%in%ratings_per_movie[ratings_per_movie$user<10,'item']),]
+
+catalog_coverage <- function(rec_list, total_items) {
+  length(unique(unlist(rec_list))) / total_items}
+
+
+k <- 30
+n <- length(unique(ML_df$item))
+
+# UBCF
+rec_ubcf <- Recommender(as(ML_df, 'realRatingMatrix'), method = "UBCF")
+top_ubcf <- predict(rec_ubcf, as(ML_df, 'realRatingMatrix'), n = k)
+cc_ubcf <- catalog_coverage(as(top_ubcf, "list"), n)
+
+# IBCF
+rec_ibcf <- Recommender(as(ML_df, 'realRatingMatrix'), method = "IBCF")
+top_ibcf <- predict(rec_ibcf, as(ML_df, 'realRatingMatrix'), n = k)
+cc_ibcf <- catalog_coverage(as(top_ibcf, "list"), n)
+
+# SVD
+rec_svd <- Recommender(as(ML_df, 'realRatingMatrix'), method = "SVD")
+top_svd <- predict(rec_svd, as(ML_df, 'realRatingMatrix'), n = k)
+cc_svd <- catalog_coverage(as(top_svd, "list"), n)
+
+# Output
+print("Catalog Coverage (Top-30):")
+print(paste("UBCF:", round(100 * cc_ubcf, 2), "%"))
+print(paste("IBCF:", round(100 * cc_ibcf, 2), "%"))
+print(paste("SVD :", round(100 * cc_svd, 2), "%"))
+
+
+
+```
+
+What do these numbers tell you, how would you interpret this? Do you think the CC value is a useful evaluation metric for LastCentury?
+
+```
+What do these numbers tell you, how would you interpret this?
+UBCF (80.42%) and IBCF (98.78%) have really high coverage, which means they're recommending almost all the movies to at least one person. Especially IBCF, which practically covers the entire catalog. These algorithms would be great if LastCentury wants to go with variety and diversity, giving every movie a chance to be seen. However, SVD (23.08%) is pretty low, which suggests it's much more selective, probably focusing only on the most relevant or popular items, so on the plus side users can have recommendations more closely aligned with their tastes
+
+Do you think the CC value is a useful evaluation metric for LastCentury?
+Well, yes and no. In some cases, CC might be helpful, if we want to find out, how diverse our recommendations are. A low CC could mean that the user is getting more relevant/similar films recommended, but on the downside, it can be the same films all over again. Too high CC would mean some recordations aren't really personalized and the model just randomly selects films from every genre or timeframe. Mixing CC with other metrics like precision, recall, or user satisfaction scores could be a solution, but at the end of the day it depends on the goal of LastCentury.
+
+```
+
+
+Source:
+
+*Aggarwal, C. C. (2016). Recommender systems (Vol. 1). Cham: Springer International Publishing.*
+
+

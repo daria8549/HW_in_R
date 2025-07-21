@@ -1,0 +1,32 @@
+---
+title: "HA.4.1__Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.4.1 (Basic - 3 points)
+
+In Unit 4, we highlighted three distinct evaluation metrics in addition to the metrics we discussed in the previous lectures. Your task now as a data scientist at LastCentury is to create a top-5 ranking out of the evaluation metrics we have discussed in this course for the higher-ups from most important to least important based on your own interpretation of their relevance to the company and its quest to improve recommendations. The answer should also contain your reasoning about the ranking and not just the ranking itself. There is not just one single correct solution to this task, we are mostly interested in your reasoning and understanding of the metrics.
+
+Reminder about some of the evaluation metrics we have used: novelty, accuracy, performance (runtime), serendipity, diversity. If you have any additional evaluation metrics from other places such as books or online sources, you are free to include those as well.
+
+```
+
+1. Accuracy – It doesn’t matter how fast or diverse the system is if it isn’t accurate.
+
+2. Diversity – After ensuring accuracy, I’d say it’s important for the recommendations to be diverse. Offering a mix of genres makes the experience better.
+
+3. Performance – Users are usually impatient, so even if the recommendations are good, if they take forever to load, the user might choose a faster source instead.
+
+4. Novelty – From my experience, users tend to stick to things they already know and cherish. Novel recommendations are great for discovery, but they’re not something users will rely on daily—maybe every other week.
+
+5. Serendipity – Similar to novelty, pleasant surprises are nice, but they’re not needed on a day-to-day basis.
+
+```

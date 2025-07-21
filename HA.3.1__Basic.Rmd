@@ -1,0 +1,29 @@
+---
+title: "HA.3.1__Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.3.1 (Basic - 3 points)
+
+As we have seen in section `4.c` of the Unit 3 notebook, there are lots of aggregation methods to use when it comes to forming group preferences. Your task now is to create a function named `no_misery` which takes a user-ratings matrix as its input and returns a sorted vector containing all movies. This vector should have a `1` for each movie which provides for 'no misery' in the group (ie all user ratings for the movie are above a specified `alpha` level) and `0` otherwise.
+
+```{r}
+
+no_misery <- function(ratings,alpha=3) {
+  nm_ratings <- apply(ratings,2,function(x) all(x>alpha,na.rm=T))
+  return(as.integer(nm_ratings))
+}
+
+test_df <- read.csv("HA.3.n__dataset.csv")
+head(no_misery(test_df))
+
+```
+

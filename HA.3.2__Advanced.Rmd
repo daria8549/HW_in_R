@@ -1,0 +1,32 @@
+---
+title: "HA.3.2__Advanced"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.3.2 (Advanced - 2 points)
+
+Building on the `no_misery` function from `HA.3.1`, create a function named `no_misery_approval` which takes a user-ratings matrix as its input and returns a sorted vector containing all movies. This vector should contain the number of approvals (check section notebook `4.c.2` for reference) for each movie (an approval being a rating being above a specified `approval_alpha`) but values should be `0` for a movie regardless the number of approvals if 'misery' is present in the group for a given movie.
+
+```{r}
+no_misery_approval <- function(ratings, approval_alpha = 4, misery_alpha = 2) {
+  sort(
+    apply(ifelse(ratings >= approval_alpha & apply(ratings, 2, function(x) !any(x <= misery_alpha, na.rm = TRUE)), 1, 0),2, function(x) {
+      sum(x, na.rm = TRUE)
+      }),
+    decreasing = TRUE)
+}
+
+test_df <- read.csv("HA.3.n__dataset.csv")
+
+head(no_misery_approval(test_df))
+
+```
+

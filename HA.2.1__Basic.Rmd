@@ -1,0 +1,23 @@
+---
+title: "IC.1.1 Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.2.1 (Basic - 3 points)
+
+In the Unit 2 notebook section `4.c` we used the Dice coefficient to compute similarities between movie keywords. Afterwards, in `4.d` we utilized TF-IDF based on movie plot summaries. This choice was deliberate. Explain in a couple of sentences why using the Dice coefficient for keywords and TF-IDF for plot summaries makes more sense than the other way round (ie TF-IDF for keywords and Dice coefficient-based similarities for movie plot summaries). Would there be a way to merge these methods into one hybrid model? Explain how you would approach this and how this could be helpful for LastCentury.
+
+```
+The Dice coefficient was originally designed to measure the similarity between two samples in statistics and works well in capturing the overlap between short, categorical data. It makes more sense to use it with key-words, rather than with summaries, which are derived from long, complex text. Unlike Dice, TF-IDF captures more relevant in context terms, rather than just common/repeated words.
+
+Regarding the Hybrid model, we could generate a weighted predicted rating, as we did in class with Naive Bayes. For content-based filtering, we employ both the Dice coefficient for keyword similarity and TF-IDF for plot similarity, and then combine them by taking the arithmetic mean of the predictions from both models. This approach provides LastCentury with an opportunity to improve prediction accuracy in their recommendation system. However, I would also argue that it will increase runtime, which might have a more significant impact on users. There are some optimization techniques for this, but whether implementing them is worth it can only be determined empirically, through user satisfaction rates or similar metrics.
+
+```

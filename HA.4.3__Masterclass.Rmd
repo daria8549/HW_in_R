@@ -1,0 +1,34 @@
+---
+title: "HA.4.3__Masterclass"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignment
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.4.3 (Masterclass - 1 point)
+
+From Aggarwal (2016):
+
+> Serendipity is a stronger condition than novelty. All serendipitious recommendations are novel, but the converse is not always true.
+
+Why is this the case? Give a hypothetical example which is relevant in the context of LastCentury.
+
+```
+
+Serendipity is stronger than novelty because it's not just about showing you something you haven’t seen before — that’s novelty. Serendipity goes further, it’s when a recommendation surprises you, feels unexpected, and still totally clicks with your preferences. So every serendipitous recommendation is novel, but not every novel one is serendipitous.
+
+Say I’m really into detective films and psychological thrillers — think Dexter, Lie to Me, or Gone Girl. If LastCentury recommends me an obscure noir thriller from the 40s I’ve never seen, that’s novel. It’s new, fits my style, but not super surprising.
+But then it recommends something totally outside my radar - an old French thriller like  Diabolique (1955). It’s not exactly labeled as a detective film, but it’s filled with paranoia, tension, and psychological mind games — basically everything there is to love in thrillers, just from a different angle. I never would’ve searched for it, but I watch it — and I’m hooked. That’s serendipity.
+
+```
+
+
+Source:
+
+*Aggarwal, C. C. (2016). Recommender systems (Vol. 1). Cham: Springer International Publishing.*

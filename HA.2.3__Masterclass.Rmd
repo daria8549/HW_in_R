@@ -1,0 +1,109 @@
+---
+title: "IC.1.1 Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.2.3 (Masterclass - 1 points)
+
+Write R code to implement a hybrid model based on the Dice coefficient and TF-IDF. You are given full creative freedom in how you use these methods, just make sure to use both. Make recommendations for one user based on this new model.
+
+```{r}
+
+library(recommenderlab)
+data("MovieLense")
+ML_df <- as(MovieLense,'data.frame')
+ML_df <- ML_df[-which(ML_df$item=='unknown'),]
+ratings_per_movie <- aggregate(user~item,ML_df,length)
+ML_df <- ML_df[!(ML_df[,'item']%in%ratings_per_movie[ratings_per_movie$user<10,'item']),]
+ML_matrix <- xtabs(rating ~ user + item, data=ML_df)
+user_x_item <- apply(as.matrix.noquote(ML_matrix),2,as.numeric)
+rownames(user_x_item) <- rownames(ML_matrix)
+
+movie_contents <- read.csv('movie_contents.csv')
+
+
+#Defining a dice coefficient function,
+dice_coefficient <- function(x,y) {
+  (2*sum(x*y))/(sum(x)+sum(y))
+}
+
+movie_x_keyword <- xtabs(occurs ~ title + keyword, data=store_keywords)
+
+#Double looping through all movies 
+dice_similarities <- apply(movie_x_keyword, 1, function(movie1) {
+  apply(movie_x_keyword, 1, function(movie2) {
+    dice_coefficient(movie1,movie2)
+  })
+})
+
+#recommendations for user 1
+i <- 1
+#Movies which user 1 has rated before
+relevant_items <- names(which(user_x_item[i,]>0))
+relevant_items <- relevant_items[relevant_items %in%
+                                   colnames(dice_similarities)]
+#Ratings by user 1
+relevant_ratings <- user_x_item[i,relevant_items]
+
+#Setting the diagonal of matrix (self-similarity) to 0
+diag(dice_similarities) <- 0
+
+#Similarities of all movies and movies rated by user 1
+similarities <- dice_similarities[,relevant_items]
+
+#Predicted rating of all movies for user 1
+dice_predicted <- apply(similarities,1,function(x) {
+  sum(x*relevant_ratings)/sum(abs(x))
+})
+
+dice_predicted_df <- data.frame(item = names(dice_predicted), dice_pred = dice_predicted)
+```
+
+```{r}
+library(superml)
+
+tfidf_model <- TfIdfVectorizer$new(max_features = 100,
+                                   remove_stopwords = T,
+                                   split=' ',
+                                   ngram_range = c(1,3))
+
+tfidf_matrix <- tfidf_model$fit_transform(movie_contents$summary)
+rownames(tfidf_matrix) <- movie_contents$title
+
+tfidf_similarities <- lsa::cosine(t(tfidf_matrix))
+diag(tfidf_similarities) <- 0
+
+#Movies which user 1 has rated before
+relevant_items_tfidf <- names(which(user_x_item[i,]>0))
+relevant_items_tfidf <- relevant_items_tfidf[relevant_items_tfidf %in%
+                                   colnames(tfidf_similarities)]
+
+#Ratings by user 1
+relevant_ratings_tfidf <- user_x_item[i,relevant_items_tfidf]
+
+#Similarities of all movies and movies rated by user 1
+similarities <- tfidf_similarities[,relevant_items_tfidf]
+
+#Predicted rating of all movies for user 1
+predicted <- apply(similarities,1,function(x) {
+  sum(x*relevant_ratings_tfidf)/sum(abs(x))
+})
+
+tfidf_predicted[is.na(tfidf_predicted)] <- 0
+tfidf_predicted_df <- data.frame(item = names(tfidf_predicted), tfidf_pred = tfidf_predicted)
+
+hybrid <- merge(dice_predicted_df, tfidf_predicted_df, by = 'item')
+
+hybrid$hybrid_pred <- as.numeric(hybrid$tfidf_pred)*0.5 + as.numeric(hybrid$dice_pred)*0.5
+
+head(hybrid[order(hybrid$hybrid_pred, decreasing = T),])
+```
+

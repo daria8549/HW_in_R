@@ -1,0 +1,92 @@
+---
+title: "IC.1.1 Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HA: Home Assignments
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HA.2.1 (Advanced - 2 points)
+
+In section `4.a` of the notebook we used clustering based on demographic data to make recommendations. We then later introduced a new dataset which had keywords and short descriptions for the movies.
+
+The higher-ups at LastCentury are pleased with your progress on improving recommendations but asked you to explore ways to incorporate this new keywords/descriptions dataset for a better experience.
+
+Your task is to create a model which incorporates movie keyword frequencies or the TF-IDF vectors of the movie descriptions and clustering as well. Make recommendations based on this model for one user.
+
+Hint: Instead of calculating similarities, cluster movies based on the frequencies and then aggregate ratings within the clusters to make recommendations for one single user.
+
+```{r}
+library(recommenderlab)
+data("MovieLense")
+ML_df <- as(MovieLense,'data.frame')
+ML_df <- ML_df[-which(ML_df$item=='unknown'),]
+ratings_per_movie <- aggregate(user~item,ML_df,length)
+ML_df <- ML_df[!(ML_df[,'item']%in%ratings_per_movie[ratings_per_movie$user<10,'item']),]
+ML_matrix <- xtabs(rating ~ user + item, data=ML_df)
+user_x_item <- apply(as.matrix.noquote(ML_matrix),2,as.numeric)
+rownames(user_x_item) <- rownames(ML_matrix)
+
+movie_contents <- read.csv('movie_contents.csv')
+
+library(superml)
+tfidf_model <- TfIdfVectorizer$new(max_features = 100,  # 100 important words
+                                   remove_stopwords = T, 
+                                   split = ' ', 
+                                   ngram_range = c(1,3))
+
+
+tfidf_matrix <- tfidf_model$fit_transform(movie_contents$summary)
+rownames(tfidf_matrix) <- movie_contents$title
+
+library(cluster)  
+set.seed(42)
+k_model <- kmeans(tfidf_matrix, 
+                  centers = 15, #Number of clusters
+                  iter.max = 100, #Number of iterations 
+                  nstart = 25) #Set to attempt multiple initial configurations.
+
+movie_clusters <- data.frame(title = rownames(tfidf_matrix), cluster = k_model$cluster)
+head(movie_clusters)
+table(k_model$cluster) #Distribution of cluster membership
+
+# average rating per movie
+movie_ratings <- aggregate(ML_df$rating ~ ML_df$item, FUN = mean)
+colnames(movie_ratings) <- c("title", "avg_rating")
+
+clustered_ratings <- merge(movie_clusters, movie_ratings, by = "title")
+head(clustered_ratings)
+
+u <- 1
+
+# ratings by user
+relevant_ratings <- user_x_item[u, relevant_items]
+
+# movies user has rated
+relevant_items <- names(which(user_x_item[u,] > 0))
+relevant_items <- relevant_items[relevant_items %in% movie_clusters$title]
+user_ratings_df <- data.frame(title = relevant_items, user_rating = relevant_ratings)
+
+# clusters for the rated movies
+user_movie_clusters <- movie_clusters[movie_clusters$title %in% relevant_items,]
+user_movie_clusters <- merge(user_movie_clusters, user_ratings_df, by = "title")
+
+# finding highest-rated cluster
+cluster_ratings <- aggregate(user_rating ~ cluster, data = user_movie_clusters, mean)
+which_cluster <- cluster_ratings$cluster[which.max(cluster_ratings$user_rating)]
+
+# all movies in the highest-rated cluster
+user_cluster_movies <- clustered_ratings[clustered_ratings$cluster == which_cluster, ]
+
+# Sort movies by rating (highest first)
+recommended_movies <- user_cluster_movies[order(-user_cluster_movies$avg_rating), ]
+head(recommended_movies, 10)
+
+```
+
+
