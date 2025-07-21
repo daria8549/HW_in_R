@@ -1,0 +1,48 @@
+---
+title: "IC.1.1 Basic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# HW: Homework exercises
+
+When submitting to Canvas, make sure to submit this .Rmd file with your solutions and not the knitted PDF, HTML or any other file. Note: In order to be able to complete the assignments, you may need to re-run the .Rmd codeblocks in the current week's notebook to have the variables required stored in your local environment.
+
+## HW.1 (Basic - 3 points)
+
+One of the biggest challenges in building a recommendation system is the cold start problem. This occurs when there is not enough data about new users or new items to generate meaningful recommendations.
+
+Your tasks are the following:
+
+- Retrieve and print out the 25 users with the fewest ratings and the corresponding number of ratings they have provided.
+- Retrieve and print out the 25 movies with the fewest ratings and the number of ratings each has received.
+
+Based on your findings, discuss in a couple of sentences the potential impact of the cold start problem on LastCentury’s recommendation system. What possible strategies could LastCentury implement to mitigate this problem?
+
+```{r}
+
+#WRITE YOUR CODE HERE (hint: use the variables ML_matrix OR ML_df as seen in the notebook)
+# Number of ratings per user
+ratings_per_user <- aggregate(item~user, ML_df, length)
+# Number of ratings per movie
+ratings_per_movie <- aggregate(user~item,ML_df, length)
+
+print(ratings_per_user[order(ratings_per_user$item, decreasing = F),][1:25,])
+print(ratings_per_movie[order(ratings_per_movie$user,decreasing=F),][1:25,])
+
+head(ML_matrix,c(3,3))
+head(ML_df,c(3,3))
+
+```
+
+```
+Regarding movies: Niche/new films might be overlooked in favor of mainstream ones due to an insufficient number of ratings/data from which to derive conclusions. As a result, users who prefer something specific or less popular might miss out on a good movie just because the system lacks data to understand the appeal.
+
+Regarding users: People who dont give the algorithm any information to work with (e.g new/inactive users), their feedback/rating on watched movies, will be less likely to receive appropriate/specific recommendation, which leads to lower engagement rate.
+
+As we discussed in class, LastCentury can use Matrix factorization technique to improve their recommendation system, which helps find hidden/non-obvious patterns both in user preferences and item characteristics even with limited data.
+
+```
