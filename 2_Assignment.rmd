@@ -1,0 +1,365 @@
+---
+date: "2024-10-30"
+output:
+  html_document:
+    fig_width: 12
+    fig_height: 12
+  pdf_document: default
+---
+
+### First step: Data Preparation
+
+Reading the .csv file
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(dplyr)
+library(caret)
+library(e1071) # For Naive Bayes
+library(ggplot2)
+library(readr)
+library(tidymodels)
+library(MASS)
+
+data <- read.csv("2_Assignment_BankChurners-1.csv", sep = ",", header = TRUE)
+```
+
+Inspecting the data structure and verifying the column types
+
+```{r}
+head(data)
+str(data)
+```
+
+Checking for empty values (N/A) in columns
+
+```{r}
+print(colSums(is.na(data)))
+```
+
+Checking if all values in columns are the same 
+
+```{r}
+constant_columns <- sapply(data, function(col) length(unique(col)) == 1)
+constant_columns
+```
+
+Columns irrelevant to the analysis, such as CLIENTNUM (unique identifier) and synthetic variables that do not contribute new information, are removed to simplify the model and improve interpretability.
+
+```{r}
+data <- subset(data, select = -c(CLIENTNUM, Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_1,
+                                 Naive_Bayes_Classifier_Attrition_Flag_Card_Category_Contacts_Count_12_mon_Dependent_count_Education_Level_Months_Inactive_12_mon_2))
+```
+
+The dataset contains both numeric and categorical variables
+
+#### Numeric Variables:
+
+* Customer_Age: Age of the customer in years.
+* Dependent_count: Number of dependents.
+* Months_on_book: Duration of customer relationship with the bank.
+* Total_Relationship_Count: Total number of products held by the customer.
+* Months_Inactive_12_mon: Number of months the customer was inactive in the last 12 months.
+* Contacts_Count_12_mon: Number of contacts with the customer in the last 12 months.
+* Credit_Limit: Credit limit on the customer’s credit card.
+* Total_Revolving_Bal: Total revolving balance on the credit card.
+* Avg_Open_To_Buy: Available credit on the card.
+* Total_Amt_Chng_Q4_Q1: Change in transaction amount between Q4 and Q1.
+* Total_Trans_Amt: Total transaction amount over the last 12 months.
+* Total_Trans_Ct: Total transaction count over the last 12 months.
+* Total_Ct_Chng_Q4_Q1: Change in transaction count between Q4 and Q1.
+* Avg_Utilization_Ratio: Average card utilization ratio.
+
+#### Categorical Variables:
+
+* Attrition_Flag: Churn indicator (1 for churned, 0 for retained).
+* Gender: Gender of the customer (M for Male, F for Female).
+* Education_Level: Highest educational qualification.
+* Marital_Status: Marital status of the customer.
+* Income_Category: Income bracket of the customer.
+* Card_Category: Type of credit card held by the customer.
+
+Converting the categorical variables to factors is essential for correctly interpreting these variables in predictive models.
+
+```{r}
+data$Attrition_Flag <- as.factor(data$Attrition_Flag)
+data$Gender <- as.factor(data$Gender)
+data$Education_Level <- as.factor(data$Education_Level)
+data$Marital_Status <- as.factor(data$Marital_Status)
+data$Income_Category <- as.factor(data$Income_Category)
+data$Card_Category <- as.factor(data$Card_Category)
+
+
+categorical_vars <- c("Attrition_Flag", "Gender", "Education_Level", "Marital_Status", 
+                      "Income_Category", "Card_Category")
+```
+
+Checking whether the ordering of the levels is intuitive, otherwise change the ordering of the levels
+
+```{r}
+sapply(data[categorical_vars], levels)
+```
+
+Reordering some of the levels 
+
+```{r}
+data$Education_Level <- factor(data$Education_Level, 
+                               levels = c("Uneducated", "High School", "College", "Post-Graduate", "Graduate", "Doctorate", "Unknown"))
+data$Marital_Status <- factor(data$Marital_Status, 
+                              levels = c("Single", "Divorced", "Married", "Unknown"))
+data$Income_Category <- factor(data$Income_Category, 
+                               levels = c("Less than $40K", "$40K - $60K", "$60K - $80K", "$80K - $120K", "$120K +", "Unknown"))
+data$Card_Category <- factor(data$Card_Category, 
+                             levels = c("Blue", "Silver", "Gold", "Platinum"))
+```
+
+Verifying the changes
+
+```{r}
+sapply(data[categorical_vars], levels)
+```
+
+Getting the summary
+
+```{r}
+summary(data)
+```
+Based on the data summary:
+
+* Churned (Attrited) Customers: 1,627
+* Total Customers: 10,127
+
+16.07% of the bank's customers have left the bank.
+
+A significant proportion of customers are existing customers, indicating a retention focus.
+The average customer age is in the mid-40s with a different educational levels and marital statuses.
+Most customers have a credit limit above $8,000, suggesting that customers are well off.
+The average utilization ratio shows that many customers use some of their available credit but keep their overall usage low.
+
+
+
+### Second step: Data Visualisation
+
+distribution of target variable
+
+```{r}
+ggplot(data, aes(x = Attrition_Flag)) + 
+  geom_bar(fill = "steelblue") +
+  labs(title = "Distribution of Attrition Flag", x = "Churn Status", y = "Count")
+```
+
+age distribution based on churn status
+
+```{r}
+ggplot(data, aes(x = Customer_Age, fill = Attrition_Flag)) + 
+  geom_histogram(binwidth = 5, alpha = 0.7, position = "identity") +
+  labs(title = "Customer Age Distribution by Churn Status", x = "Customer Age", y = "Count")
+```
+
+Attrition_Flag against numerical variables
+
+```{r}
+plot(Attrition_Flag ~ Customer_Age, data = data, main = "Attrition vs Customer Age")
+plot(Attrition_Flag ~ Credit_Limit, data = data, main = "Attrition vs Credit Limit")
+plot(Attrition_Flag ~ Avg_Utilization_Ratio, data = data, main = "Attrition vs Avg Utilization Ratio")
+```
+
+Plot Attrition_Flag against categorical variables
+
+```{r}
+plot(Attrition_Flag ~ Gender, data = data, main = "Attrition vs Gender")
+plot(Attrition_Flag ~ Education_Level, data = data, main = "Attrition vs Education Level")
+plot(Attrition_Flag ~ Marital_Status, data = data, main = "Attrition vs Marital Status")
+plot(Attrition_Flag ~ Income_Category, data = data, main = "Attrition vs Income Category")
+plot(Attrition_Flag ~ Card_Category, data = data, main = "Attrition vs Card Category")
+```
+```{r}
+boxplot(Credit_Limit ~ Attrition_Flag, data = data,
+        main = "Credit Limit by Attrition Flag",
+        xlab = "Attrition Flag",
+        ylab = "Credit Limit",
+        col = c("lightblue", "lightgreen"))
+
+hist(data$Customer_Age, main = "Distribution of Customer Age", 
+     xlab = "Customer Age", col = "lightblue", breaks = 30)
+
+barplot(table(data$Education_Level), main = "Education Level Distribution", 
+        col = "lightgreen", las = 2)  # las = 2 makes the labels perpendicular to the axis
+```
+
+Based on the graphs, several variables appear related to churn:
+
+* Customer Age: Younger and older customers show higher churn rates than mid-aged groups.
+* Credit Limit: Lower credit limits are associated with higher churn.
+* Avg Utilization Ratio: High utilization correlates with increased churn.
+* Total Transaction Count: Fewer transactions link to higher churn rates.
+* Income and Card Category: Lower-income customers and those with basic cards (e.g., Blue) churn more.
+* Contacts Count: Frequent contact with the bank reduces churn likelihood.
+
+### Third step: Model Training and Initial Logistic Regression
+
+The dataset is split into training and testing sets, which is essential for evaluating model performance on unseen data, ensuring that model selection is based on predictive ability rather than data memorization.
+
+```{r}
+set.seed(123)
+n <- nrow(data)
+m <- 0.8 * n
+train_ind <- sample(1:n, size = m)
+
+train_data <- data[train_ind, ]
+test_data <- data[-train_ind, ]
+```
+
+
+A logistic regression model is trained on all available predictors to identify factors significantly associated with churn. The summary provides insights into which features are statistically significant.
+
+```{r}
+fit_glm_all <- glm(Attrition_Flag ~ ., data = train_data, family = binomial())
+summary(fit_glm_all)
+```
+
+This model serves as the foundation for further refinement, with results revealing that factors like `Gender`, `Marital_Status`, `Income_Category`, and certain transaction features influence churn.
+
+Variables related to churn
+Gender: Male customers are more likely to attrite compared to female customers.
+Marital_Status: Married customers are more likely to attrite compared to single customers.
+Income_Category: $120K +: Customers in this income bracket are significantly less likely to attrite.
+Card_Category (Gold): Gold cardholders are less likely to attrite compared to the Blue category.
+
+
+### Fourth step: Stepwise Logistic Regression Model Selection
+
+Using stepwise selection with AIC as the criterion, we refine the logistic model by iteratively removing less significant predictors to achieve a model with a lower AIC.
+
+```{r}
+fit_glm_step <- stepAIC(fit_glm_all, direction = "both")
+summary(fit_glm_step)
+```
+
+The resulting stepwise model simplifies the set of predictors while retaining key influences on churn. From this model, we calculate odds ratios for select variables, such as:
+
+```{r}
+coefficients <- summary(fit_glm_step)$coefficients
+```
+
+1. Odds Ratio for one more contact
+
+
+```{r}
+contact_coef <- coefficients["Contacts_Count_12_mon", "Estimate"]
+odds_ratio_contact <- exp(contact_coef)
+cat("Odds Ratio for one more contact:", odds_ratio_contact, "\n")
+```
+
+2. Odds Ratio for Platinum card
+
+```{r}
+platinum_coef <- coefficients["Card_CategoryPlatinum", "Estimate"]
+odds_ratio_platinum <- exp(platinum_coef)
+cat("Odds Ratio for Platinum card vs. Blue card:", odds_ratio_platinum, "\n")
+```
+
+3. Odds Ratio for increasing credit limit by $1,000
+
+```{r}
+credit_limit_coef <- coefficients["Credit_Limit", "Estimate"]
+odds_ratio_credit_limit <- exp(credit_limit_coef * 1000)
+cat("Odds Ratio for increasing credit limit by $1,000:", odds_ratio_credit_limit, "\n")
+```
+* Odds for Churn with Additional Contact: For each additional contact made with the customer, the odds of churn decrease by approximately 40%. This tells us that increased engagement through contacts is associated with lower attrition rates.
+
+
+* Odds for Churn with Platinum Card vs. Blue Card: If a customer has a Gold card instead of a Blue card, the odds of churn decrease by approximately 65%. Meaning that Gold cardholders are significantly less likely to churn compared to those with a Blue card.
+
+* Odds for Churn with $1,000 Credit Limit Increase: For every $1000 increase in credit limit, the odds of churn increase by approximately 1.73%. While this effect is small, it indicates that higher credit limits may correlate with a slightly higher likelihood of attrition.
+
+
+### Fifth step: k-Nearest Neighbors (k-NN) Model Training
+
+To diversify model selection, we implement a k-NN model using 5-fold cross-validation, testing various k values. Accuracy metrics are calculated for each to determine the optimal k. The final k-NN model, chosen based on the best cross-validated accuracy, provides an alternative, non-parametric approach for churn prediction.
+
+```{r}
+fitControl <- trainControl (method = "cv", number = 5)
+
+#k-NN model with cross-validation
+knn_fit_cv <- train(Attrition_Flag ~ ., 
+                   data = train_data,
+                   method = "knn",
+                   preProc = c("scale"),
+                   tuneGrid = data.frame(k=c(1,3,5,7,9,11,13)),
+                   trControl = fitControl)
+knn_fit_cv
+```
+
+### Sixth step: Naive Bayes Model
+
+A Naive Bayes model, known for its simplicity and efficiency in handling categorical data, is trained on the same data. This model is particularly useful for capturing straightforward patterns in the categorical variables related to churn.
+
+```{r}
+fit_nb <- naiveBayes(Attrition_Flag ~ ., data = train_data)
+```
+
+### Seventh step: Model Comparison and Evaluation
+
+All four models (full logistic regression, stepwise logistic regression, k-NN, and Naive Bayes) are compared on the test data using accuracy, recall, and precision as evaluation metrics:
+
+```{r}
+p_full <- predict(fit_glm_all, newdata = test_data, type = "response")
+
+# Converting predicted probabilities to class labels
+p_full_class <- ifelse(p_full >= 0.5, "Attrited Customer", "Existing Customer")
+p_full_class <- factor(p_full_class, levels = levels(test_data$Attrition_Flag))
+
+# Predictions for Stepwise Logistic Regression
+p_step <- predict(fit_glm_step, newdata = test_data, type = "response")
+# Converting predicted probabilities to class labels for stepwise model
+p_step_class <- ifelse(p_step >= 0.5, "Attrited Customer", "Existing Customer")
+p_step_class <- factor(p_step_class, levels = levels(test_data$Attrition_Flag))
+
+
+# Predictions for k-NN
+yhat_knn <- predict(knn_fit_cv, newdata = test_data)
+
+# Predictions for Naive Bayes
+yhat_nb <- predict(fit_nb, newdata = test_data)
+
+
+levels(p_full_class)
+levels(test_data$Attrition_Flag)
+levels(p_full_class) <- levels(test_data$Attrition_Flag)
+
+
+# Confusion Matrices
+confusion_full <- confusionMatrix(p_full_class, test_data$Attrition_Flag, positive = "Attrited Customer")
+confusion_step <- confusionMatrix(p_step_class, test_data$Attrition_Flag, positive = "Attrited Customer")
+confusion_knn <- confusionMatrix(yhat_knn, test_data$Attrition_Flag, positive = "Attrited Customer")
+confusion_nb <- confusionMatrix(yhat_nb, test_data$Attrition_Flag, positive = "Attrited Customer")
+
+# Metrics for each model
+cat("Full Logistic Regression Model:",
+    "Accuracy:", confusion_full$overall["Accuracy"],
+    "Recall:", confusion_full$byClass["Recall"],
+    "Precision:", confusion_full$byClass["Precision"], "\n\n")
+
+cat("Stepwise Logistic Regression Model:",
+    "Accuracy:", confusion_step$overall["Accuracy"],
+    "Recall:", confusion_step$byClass["Recall"],
+    "Precision:", confusion_step$byClass["Precision"], "\n\n")
+
+cat("k-NN Model:",
+    "Accuracy:", confusion_knn$overall["Accuracy"],
+    "Recall:", confusion_knn$byClass["Recall"],
+    "Precision:", confusion_knn$byClass["Precision"], "\n\n")
+
+cat("Naive Bayes Model:",
+    "Accuracy:", confusion_nb$overall["Accuracy"],
+    "Recall:", confusion_nb$byClass["Recall"],
+    "Precision:", confusion_nb$byClass["Precision"], "\n\n")
+```
+#### Final Results:
+
+* Full Logistic Regression: Shows moderate accuracy and recall but lower precision.
+* Stepwise Logistic Regression: Similar to the full model, but with fewer predictors.
+* k-NN: Achieves high accuracy but lower recall compared to Naive Bayes.
+* Naive Bayes: Achieves high accuracy and recall, suggesting it as the best model for churn prediction due to its balance of capturing churned customers (recall) while maintaining overall accuracy.
+
+Given these results, Naive Bayes is selected as the optimal model due to its effectiveness in identifying churned customers (key for proactive retention strategies) while providing good overall accuracy.

@@ -1,0 +1,149 @@
+---
+title: "Data Analytics Assignment 4, Group 2"
+author: "Beliakov Grigorii, Bilan Yevhen, Gagajew Said-Magamed, Mija Andrei, Polianska Daria"
+date: "2024-11-11"
+output:
+  html_document:
+    fig_width: 12
+    fig_height: 12
+  pdf_document: default
+---
+
+## First step: Data Preparation
+
+Reading the rds file
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+rmf <- readRDS("4_Assignment_rmf.rds")
+str(rmf)
+summary(rmf)
+head(rmf)
+any(is.na(rmf))
+sapply(rmf, class)
+
+```
+
+
+## Task 1
+
+# Visualizing the data using a pairs plot and a biplot
+
+```{r}
+pairs(rmf, main = "RFM Data Pairs Plot")
+
+rpca <- princomp(scale(rmf))
+biplot(rpca, main = "PCA Biplot of RFM Data", scale = 0.5)
+```
+
+## Task 2
+
+# The elbow method
+```{r}
+kmcs <- lapply(ks <- 1:9, function(k) kmeans(rmf, nstart = 10, centers = k))
+ss <- unlist(lapply(kmcs, function(obj) obj$tot.withinss))
+plot(ks, ss, type = "b", main = "Elbow Method for Optimal k",
+     xlab = "Number of Clusters (k)", ylab = "Total Within-Cluster Sum of Squares")
+```
+Optimal number of clusters seems to be 4
+
+# K-means
+```{r}
+
+rkmc <- kmeans(rmf, centers = 4, nstart =10)
+scores <- rpca$scores[, 1:2]
+plot(scores, pch = 20, cex = 0.8, col = rkmc$cluster,
+     main = "K-means Clustering on PCA Components", 
+     xlab = "PC1", ylab = "PC2",
+     xlim = c(-2.5, 5), ylim = c(-8, 3))
+text(scores, labels = rownames(rmf), adj = c(-0.2, 1),
+     cex = 0.8, col = rkmc$cluster)
+```
+
+# Gap Statistic
+In order to confirm the number of clusters:
+```{r}
+library("cluster")
+# Subset only numeric columns
+numeric_rmf <- rmf[, c("Frequency", "Monetary.mean", "Recency")]
+
+# Check for NA values and remove them
+numeric_rmf <- na.omit(numeric_rmf)
+
+# Run the gap statistic
+gap.stat <- clusGap(numeric_rmf, kmeans, nstart = 10, K.max = 9, B = 20)
+
+plot(gap.stat)
+```
+
+# Hierarchical clustering
+
+```{r}
+rdist <- dist(rmf, method = "euclidean")
+rclust <- hclust(rdist, method = "complete")
+plot(rclust, main = "Hierarchical Clustering Dendrogram")
+rect.hclust(rclust, k = 4)
+
+groups <- cutree(rclust, k = 4)
+head(groups)
+```
+
+# DBSCAN
+
+```{r}
+library(dbscan)         
+rdbs <- dbscan(rmf, eps = 30)
+dbscan_clusters <- rdbs$cluster
+
+```
+eps = 30 needed due to the fact that most points grouped in one large cluster with a few outliers
+
+# Comparison
+```{r}
+plot(scores, pch = 20, cex = 0.8, col = rkmc$cluster,
+     main = "K-means Clustering on PCA Components", 
+     xlab = "PC1", ylab = "PC2", 
+     xlim = c(-2.5, 5), ylim = c(-8, 3))
+```
+K-means seems to group data fairly well, clusters in the output are well separated, although some clusters might include potential outliers.
+```{r}
+plot(scores, pch = 20, cex = 0.8, col = groups,
+     main = "Hierarchical Clustering on PCA Components", 
+     xlab = "PC1", ylab = "PC2", 
+     xlim = c(-2.5, 5), ylim = c(-8, 3))
+```
+Only a few small clusters have been separated out, suggesting hierarchical clustering treats most data as one main cluster. It might be less effective for the final analysis.
+```{r}
+plot(scores, pch = 20, cex = 0.8, col = dbscan_clusters,
+     main = "DBSCAN Clustering on PCA Components", 
+     xlab = "PC1", ylab = "PC2", 
+     xlim = c(-2.5, 5), ylim = c(-8, 3))
+```
+Similar to hierarchical clustering, DBSCAN has classified most points as belonging to a single large cluster and distinguished only a few outliers.
+
+All in all: K-means provided the most distinct clusters with clear boundaries between them, while Hierarchical Clustering and DBSCAN mostly grouped points into one large cluster with a few smaller groups.
+
+## Task 4
+
+Adding cluster labels to the RFM data
+```{r}
+rmf$Cluster <- factor(rkmc$cluster)
+summary(rmf)
+```
+
+# Calculating average RFM values for each cluster
+```{r}
+
+cluster_summary <- aggregate(rmf[, c("Recency", "Frequency", "Monetary.mean")], 
+                             by = list(Cluster = rmf$Cluster), 
+                             FUN = mean)
+print(cluster_summary)
+```
+
+Cluster 1: This segment consists of customers who make high-value purchases but shop infrequently. Their average recency score suggests that they don't shop very recently or regularly. However, when they do shop, they spend significantly. (High-value, low-engagement customers)
+
+Cluster 2: These are customers who shop moderately often and spend a moderate amount per purchase. They return somewhat regularly (lower recency than Cluster 1), making them relatively engaged compared to other clusters.
+
+Cluster 3: This cluster has the highest recency value, indicating that these customers have made a purchase most recently but tend to make low-cost purchases. Their metrics indicates active engagement.(High-frequency, low-value customers)
+
+Cluster 4: Customers in this cluster have a high frequency of purchase, suggesting strong engagement. But the last purchase was made long ago
+

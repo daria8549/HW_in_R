@@ -1,0 +1,247 @@
+---
+date: "2024-10-23"
+output: 
+  html_document:
+    fig_width: 12
+    fig_height: 12 
+---
+## First step: Data Preparation
+Reading the .csv file
+```{r}
+data <- read.csv("1_Assignment_airbnb.csv", sep =",", header = TRUE)
+
+head(data)
+str(data)
+```
+Checking for empty values (N/A) in columns
+```{r}
+print(colSums(is.na(data)))
+```
+Checking if all values in columns are the same 
+```{r}
+constant_columns <- sapply(data, function(col) length(unique(col)) == 1)
+constant_columns
+```
+
+Both ```attr_index``` and ```attr_index_norm``` provide the same information on different scales similarly with ```rest_index``` and ```rest_index_norm```.
+```lng``` and ```lat``` describe the geographical location, which can already be captured by distance-related variables like ```dist```, ```metro_dist```, ```attr_index```
+```{r}
+data <- data[ , !(names(data) %in% c("X","lng", "lat","attr_index_norm", "rest_index_norm"))]
+```
+Converting char
+```{r}
+data$room_type <- factor(data$room_type)
+```
+Converting dummy variables
+```{r}
+data$room_shared <- as.factor(data$room_shared)
+data$room_private <- as.factor(data$room_private)
+data$host_is_superhost <- as.factor(data$host_is_superhost)
+data$multi <- as.factor(data$multi)
+data$biz <- as.factor(data$biz)
+data$weekend <- as.factor(data$weekend)
+```
+## Step 2: Data analysis
+```{r}
+summary(data)
+```
+* The price for two people and two nights ranges from €63.58 to a high of €13,664.31, with a median of €208.49
+* The majority of listings are Entire home/apt (2747 out of 3537), making up the bulk of the dataset.
+* The typical listing accommodates between 2 to 6 guests, with a median capacity of 3 people.
+```{r}
+str(data)
+```
+* The dataset contains 3537 observations and 16 variables related to Airbnb listings in Vienna.
+* Numerical variables: `realSum` (price), `person_capacity`, `cleanliness_rating`, `guest_satisfaction_overall`, `bedrooms`, `dist`, `metro_dist`, `attr_index`, and `rest_index`
+* Categorical (factor) variables: `room_type` (3 levels: Entire home/apt, Private room, Shared room), `room_shared`, `room_private`, `host_is_superhost`, `multi`, `biz`, and `weekend` (all binary: 0 or 1).
+```{r}
+numeric_vars <- sapply(data, is.numeric)
+correlation_matrix <- cor(data[, numeric_vars])
+correlation_matrix
+```
+* Weak correlation with price (`realSum`): None of the variables shows a strong correlation with `realSum`. 
+* The highest correlation is with `person_capacity` (0.10), indicating a very weak positive relationship between the number of people a listing can accommodate and its price.
+* `attr_index` and `rest_index` (0.88): Strong positive correlation, suggesting that areas with high restaurant density tend to have higher attractiveness scores
+```{r}
+plot(data$dist, data$realSum, 
+     main = "realSum vs. Distance", 
+     xlab = "Distance", 
+     ylab = "realSum")
+
+plot(data$dist, data$realSum,
+     ylim = c(0, 1000),
+     main = "realSum vs. Distance (Excluding outliers)", 
+     xlab = "Distance", 
+     ylab = "realSum")
+
+boxplot(realSum ~ room_type, data = data, 
+        main = "realSum by Room Type", 
+        xlab = "Room Type", 
+        ylab = "realSum", 
+        col = c("lightblue", "lightgreen", "lightpink"))
+```
+
+Filter out extreme values above 1000 for better analysis
+
+```{r}
+filtered_data <- subset(data, realSum < 1000)
+
+summary(filtered_data)
+```
+* Price (realSum): The mean price is €230.39 for two nights, with a less wide range from €63.58 to €892.41.
+* Room Type: The majority of listings are still for "Entire home/apt" (2,746 out of 3,534), but with fewer private rooms (772) and very few shared rooms (16).
+* Capacity: The average listing accommodates 3.35 people, with a maximum capacity of 6
+```{r}
+str(filtered_data)
+```
+* The filtered dataset has 3,534 observations, which is slightly reduced from 3,537 in the original.
+* Both datasets contain the same 16 variables, with no changes in variable types.
+* ```realSum```: Old: The maximum price was €13,664.31, indicating the presence of extreme values.
+* ```realSum```: Filtered: The maximum price is now €892.41
+```{r}
+numeric_vars_2 <- sapply(filtered_data, is.numeric)
+correlation_matrix_2 <- cor(filtered_data[, numeric_vars_2])
+correlation_matrix_2
+```
+* Old Data: The correlation between `realSum` and most variables was generally weak, with `person_capacity` showing a weak positive correlation (0.10), while `dist` and `metro_dist` had weak negative correlations (-0.08 and -0.04, respectively).
+* Filtered Data: In the filtered data, the correlation between `realSum` and `person_capacity` is much stronger (0.46), indicating that the number of people the listing can accommodate is now a much stronger predictor of price.
+* Similarly, the correlation with `bedrooms` also increased significantly (0.33 vs. 0.08). The correlations with `dist` (-0.26) and `metro_dist` (-0.14) became more negative, suggesting that distance from the city center and metro stations now have a more clear inverse relationship with price.
+
+Calculation of Pearson correlation coefficients
+```{r}
+correlation_results <- cor(filtered_data[, c("realSum", "bedrooms", "dist", "person_capacity")])
+print(correlation_results)
+```
+## Step 3: Data Visualisation 
+
+Scatter Plot for filtered data:
+
+```{r}
+plot(filtered_data$person_capacity, filtered_data$realSum, 
+     main = "realSum vs. Person Capacity (Excluding Outliers)", 
+     xlab = "Person Capacity", 
+     ylab = "realSum", 
+     pch = 19, 
+     col = "blue")
+abline(lm(realSum ~ person_capacity, data = filtered_data), col = "red", lwd = 2)
+```
+
+Boxplot for filtered data:
+
+```{r}
+boxplot(realSum ~ room_type, data = filtered_data,
+        main = "realSum by Room Type (Excluding Outliers)",
+        xlab = "Room Type",
+        ylab = "realSum",
+        col = c("lightblue", "lightgreen", "lightpink"))
+```
+
+Histogram for `realSum`:
+
+```{r}
+hist(filtered_data$realSum, main="Distribution of realSum", xlab="realSum", col="lightblue", breaks=30)
+```
+
+Bar plot for `room_type`:
+
+```{r}
+barplot(table(filtered_data$room_type), main="Room Type Distribution", xlab="Room Type", ylab="Count", col="lightgreen")
+```
+
+
+## Full model with all potential predictors
+
+```{r}
+full_model <- lm(realSum ~ ., data = filtered_data)
+summary(full_model)
+```
+
+### Significant Variables: 
+
+* `room_typePrivate room`: -54.15 (p < 2e-16)
+* `room_typeShared room`: -80.56 (p = 7.31e-05) 
+* `person_capacity`: +20.48 (p < 2e-16)
+* `bedrooms`: +34.38 (p < 2e-16) 
+* `cleanliness_rating`: +11.12 (p = 7.81e-08)
+* `biz`: +29.91 (p < 2e-16) 
+* `dist`: -6.60 (p = 1.41e-10)
+* `guest_satisfaction_overall`: +0.80 (p = 0.00136)
+* `weekend`: +8.65 (p = 0.00140)
+
+
+### Stepwise selection (backward elimination):
+
+```{r}
+stepwise_model <- step(full_model, direction = "backward")
+summary(stepwise_model)
+```
+
+## Interpretation of our results:
+
+The positive coefficients for variables such as `person_capacity`, `biz`, `cleanliness_rating`, `guest_satisfaction_overall`, `bedrooms`, `attr_index`, and `weekend`. They align with intuitive expectations; more capacity, higher cleanliness ratings, and positive guest experiences typically lead to higher prices.
+
+The negative coefficients for room_typePrivate room and room_typeShared room are not surprising, as shared accommodations offer less privacy and hence command lower prices. 
+
+Private room (-54.02): Choosing a private room, compared to an entire home/apartment, is associated with a decrease of approximately $54.02 in price. This indicates that in the analyzed dataset, private rooms are less expensive than entire homes.
+
+Distance (-7.08): For each additional unit of distance (presumably in miles or kilometers) from a reference point (e.g., city center), the price of the listing decreases by $7.08.
+
+Weekend (8.69): Listings available on weekends show an increase in price of about $8.69 compared to those not available on weekends.
+
+## Step 4: Modelling
+
+Mean Squared Error (MSE) for full model, stepwise model, and additional model
+
+```{r}
+mse_full_model <- mean((filtered_data$realSum - predict(full_model, filtered_data))^2)
+mse_stepwise_model <- mean((filtered_data$realSum - predict(stepwise_model, filtered_data))^2)
+
+# Print MSE values
+
+cat("MSE for Full Model: ", mse_full_model, "\n")
+cat("MSE for Stepwise Model: ", mse_stepwise_model, "\n")
+```
+
+Make sure that any random results in R can be recreated exactly the same way:
+
+```{r}
+set.seed(123)
+
+n <- nrow(filtered_data)
+m <- floor(0.80*n)
+
+index_train <- sample(1:n, m, replace = FALSE)
+
+train_data <- filtered_data[index_train, -5]
+test_data <- filtered_data[-index_train, -5]
+```
+
+Fit the full model to the training data
+
+```{r}
+full_model_train <- lm(realSum ~ ., data = train_data)
+stepwise_model_train <- step(full_model_train, direction = "backward")
+
+predictions_full <- predict(full_model_train, newdata = test_data)
+predictions_stepwise <- predict(stepwise_model_train, newdata = test_data)
+
+# Calculate training MSE and test MSE for both models
+train_mse_full <- mean((train_data$realSum - predict(full_model_train, train_data))^2)
+test_mse_full <- mean((test_data$realSum - predictions_full)^2)
+
+train_mse_stepwise <- mean((train_data$realSum - predict(stepwise_model_train, train_data))^2)
+test_mse_stepwise <- mean((test_data$realSum - predictions_stepwise)^2)
+
+
+cat("Training MSE for Full Model: ", train_mse_full, "\n")
+cat("Test MSE for Full Model: ", test_mse_full, "\n")
+cat("Training MSE for Stepwise Model: ", train_mse_stepwise, "\n")
+cat("Test MSE for Stepwise Model: ", test_mse_stepwise, "\n")
+```
+
+## Final Remarks: 
+
+In theory, the more complex model (full model) should have a lower training MSE and a higher test MSE due to overfitting, while the simpler model (stepwise model) may perform better on unseen data.
+However, based on the actual results, the full model achieves a lower training MSE (7119.096) compared to the stepwise model (7135.313), but it also has a lower test MSE (5681.167) versus the stepwise model (5683.351). 
+In conclusion, the full model performs best on both training and test datasets, it means that it generalizes better in this case, and the test MSE should be used for selecting the final model.
+

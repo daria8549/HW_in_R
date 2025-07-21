@@ -1,0 +1,177 @@
+---
+date: "2024-11-05"
+output:
+  html_document:
+    fig_width: 12
+    fig_height: 12
+  pdf_document: default
+---
+
+### First step: Data Preparation
+
+Reading the .csv file
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library("rpart")
+library("party")
+library("partykit")
+library("ranger")
+library("MASS")
+housing <- read.csv("3_Assignment_housing.csv", stringsAsFactors = TRUE)
+summary(housing)
+```
+
+Dealing with missing values
+
+```{r}
+sum(is.na(housing)) # How many missing values are there? Output: 207
+housing_clean <- na.omit(housing)
+```
+
+## Task 1
+
+Visualizing before and after cleaning
+
+```{r}
+par(mfrow = c(2, 1), mar = c(3, 3, 2, 1)) #for visualizing the plots at the same time
+hist(housing$median_house_value, xlab = "Median Hause Value", main = "Before Cleaning", col = "lightblue")
+hist(housing_clean$median_house_value, xlab = "Median Hause Value", main = "After Cleaning", col = "lightgreen")
+par(mfrow = c(1, 1)) # going back to normal
+```
+
+It seems like there is no significant difference between graphs, so I decided to calculate the percentage of rows, that's have been removed
+
+```{r}
+removed_rows <- nrow(housing) - nrow(housing_clean)
+percentage_removed <- (removed_rows / nrow(housing)) * 100
+print(percentage_removed)
+```
+Indeed we removed only 1% of rows, so it won't be apparent on the graph
+
+## Task 2
+
+Training a Regression Tree
+
+```{r}
+tree_model <- rpart(median_house_value ~ ., data = housing_clean)
+plot(as.party(tree_model))
+summary(tree_model)
+```
+The most important variable in predicting median_house_value is median_income, followed by ocean_proximity and longitude. This means that higher income levels and proximity to the ocean significantly influence housing prices.
+The main split is based on median_income < 5.07535. This means that if median_income is less than 5.07535, the observations go to the left (Node 2); otherwise, they go to the right (Node 3).
+
+
+## Task 3
+
+Training a Random Forest Model
+
+```{r}
+rf_model <- ranger(
+  median_house_value ~ .,
+  data = housing_clean,
+  importance = "permutation"
+)
+```
+
+Importance scores
+
+```{r}
+barplot(importance(rf_model), main = "Importance")
+```
+
+Barplot indicates that the most important variable in predicting median_house_value is median_income, followed by ocean_proximity and longitude. These results correspond to the results in tree_model.
+
+Partial dependency plots
+
+Grid over the range of median_income
+
+```{r}
+grd <- seq(min(housing_clean$median_income), max(housing_clean$median_income), length.out = 20)
+```
+
+Sample of data for prediction
+
+```{r}
+nd <- housing_clean[sample.int(nrow(housing_clean), 300), ]
+```
+
+Partial dependence predictions
+
+```{r}
+prs <- lapply(grd, function(val) {
+  nd$median_income <- val
+  predict(rf_model, data = nd)$predictions
+})
+print(grd)
+```
+
+Plot for results
+
+```{r}
+matplot(grd, t(do.call("cbind", prs)), type = "l", col = rgb(.1, .1, .1, .1),
+        lty = 1, xlab = "Median Income", ylab = "Predicted Median House Value",
+        main = "Partial Dependency Plot for Median Income")
+```
+
+An increase (ca. from 2 to 8 TSD) suggests that higher incomes correlate with higher house values.
+The plot levels off at higher income levels (ca. from 10 to 15 TSD), it suggests that after a certain point, income no longer significantly influences house prices.
+
+
+## Task 4
+
+Cross-Validation Code:
+#set.seed(123)  # For reproducibility
+```{r}
+n <- nrow(housing_clean)# sample size
+fold <- 10  # 10-fold cross-validation
+```
+
+Generate cross-validation folds
+
+```{r}
+folds <- sample(rep(1:fold, ceiling(n / fold)), n)
+```
+
+Initialize a list to store MSE for each model
+
+```{r}
+mse_list <- list()
+```
+
+Cross-validation loop
+
+```{r}
+for (tfold in seq_len(fold)) {
+  # Create training and test indices
+  train_idx <- which(folds != tfold)
+  test_idx <- which(folds == tfold)
+  
+  rf_model <- ranger(median_house_value ~ ., data = housing_clean[train_idx, ])
+  tree_model <- rpart(median_house_value ~ ., data = housing_clean[train_idx, ])
+  lrm_model <- lm(median_house_value ~ ., data = housing_clean[train_idx, ])
+  
+  # Make predictions
+  p_rf <- predict(rf_model, data = housing_clean[test_idx, ])$predictions
+  p_tree <- predict(tree_model, newdata = housing_clean[test_idx, ])
+  p_lrm <- predict(lrm_model, newdata = housing_clean[test_idx, ])
+  
+  # Calculating MSE for each model and storing it in the list
+  mse_list[[tfold]] <- unlist(lapply(
+    list(rf = p_rf, tree = p_tree, lm = p_lrm), function(predicted) {
+      mean((housing_clean[test_idx, "median_house_value"] - predicted)^2)
+    }
+  ))
+}
+```
+
+Combining and visualizing MSEs
+
+```{r}
+boxplot(do.call("rbind", mse_list), 
+        ylab = "Cross-validated MSE", 
+        main = "Model Comparison: MSE")
+```
+
+The random forest model (rf), being at the bottom with the lowest MSE, indicates it is performing the best among the three models.
+On the contrary decision tree model has the highest MSE, performing the worst among the three. It may be due to the overfitting of training data.
+The linear regression model (lrm) has a slightly lower MSE than the decision tree model but is still performing relatively poorly compared to the random forest model.
